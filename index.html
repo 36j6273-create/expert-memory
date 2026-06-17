@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>김시은 | 디지털 전시관</title>
+    <style>
+        /* -----------------------------------------
+         * 1. DESIGN SYSTEM & RESET
+         * ----------------------------------------- */
+        :root {
+            --bg-ivory: #F7F3E8;       /* 무하풍의 따뜻한 상아색 */
+            --bg-card: #FFFDF9;        
+            --primary-pomegranate: #8C1D24; /* 석류빛 붉은색 */
+            --secondary-amber: #D9822B;     /* 호박색 */
+            --accent-plant: #3A5943;        /* 아르누보 딥 그린 */
+            --text-dark: #2B241F;           
+            --text-light: #FFFDF9;
+            --border-gold: #C5A059;         /* 황금빛 장식 색상 */
+            
+            --font-main: 'Noto Serif KR', serif;
+            --shadow-art: 0 15px 35px rgba(197, 160, 89, 0.2);
+            --transition-smooth: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@300;500;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-main), sans-serif;
+            background-color: var(--bg-ivory);
+            color: var(--text-dark);
+            overflow-x: hidden;
+            line-height: 1.7;
+        }
+
+        /* -----------------------------------------
+         * 2. MOUSE TRACKING SPOTLIGHT & ART PATTERN
+         * ----------------------------------------- */
+        /* 마우스를 따라 움직이는 아르누보 스포트라이트 레이어 */
+        .spotlight-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 9999;
+            /* 기본 상태는 전체가 살짝 톤다운, JS로 마우스 위치에 radial-gradient 투명 원 생성 */
+            background: radial-gradient(circle 250px at var(--mouse-x, 50%) var(--mouse-y, 50%), transparent 100%, rgba(43, 36, 31, 0.15) 100%);
+        }
+
+        /* 아르누보 식물 및 덩굴 양식 복합 배경 패턴 */
+        .mucha-pattern-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.25;
+            background-image: 
+                radial-gradient(circle at 100% 150%, transparent 24%, var(--border-gold) 24%, var(--border-gold) 26%, transparent 26%, transparent 39%, var(--border-gold) 39%, var(--border-gold) 41%, transparent 41%),
+                radial-gradient(circle at 0% 150%, transparent 24%, var(--border-gold) 24%, var(--border-gold) 26%, transparent 26%, transparent 39%, var(--border-gold) 39%, var(--border-gold) 41%, transparent 41%),
+                linear-gradient(45deg, transparent 45%, var(--accent-plant) 45%, var(--accent-plant) 55%, transparent 55%),
+                linear-gradient(-45deg, transparent 45%, var(--accent-plant) 45%, var(--accent-plant) 55%, transparent 55%);
+            background-size: 100px 100px;
+        }
+
+        /* 고풍스러운 미술관 액자 프레임 형태의 외부 테두리 */
+        .gallery-frame {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border: 2px solid var(--border-gold);
+            pointer-events: none;
+            z-index: 9000;
+        }
+        .gallery-frame::before {
+            content: '';
+            position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 1px dashed rgba(140, 29, 36, 0.4);
+        }
+
+        /* -----------------------------------------
+         * 3. GLOBAL COMPONENTS
+         * ----------------------------------------- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 50px;
+        }
+
+        .reveal {
+            opacity: 0;
+            transform: translateY(60px);
+            transition: var(--transition-smooth);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        section {
+            padding: 150px 0;
+            position: relative;
+        }
+
+        /* 알폰스 무하 고유의 곡선 패턴과 금박 테두리를 적용한 카드 */
+        .art-card {
+            background-color: var(--bg-card);
+            border: 2px solid var(--border-gold);
+            border-radius: 2px;
+            padding: 55px 45px;
+            position: relative;
+            box-shadow: var(--shadow-art);
+            transition: var(--transition-smooth);
+        }
+        /* 무하 특유의 네 귀퉁이 원형 데코 장식 */
+        .art-card::before {
+            content: '✿';
+            position: absolute;
+            top: 5px; left: 5px;
+            color: var(--border-gold);
+            font-size: 0.8rem;
+        }
+        .art-card::after {
+            content: '✿';
+            position: absolute;
+            bottom: 5px; right: 5px;
+            color: var(--border-gold);
+            font-size: 0.8rem;
+        }
+
+        .art-card:hover {
+            transform: translateY(-8px) scale(1.01);
+            border-color: var(--primary-pomegranate);
+        }
+
+        .section-title {
+            font-size: 2.8rem;
+            color: var(--primary-pomegranate);
+            text-align: center;
+            margin-bottom: 70px;
+            font-weight: 700;
+            letter-spacing: 3px;
+        }
+        .section-title::after {
+            content: '';
+            display: block;
+            width: 200px;
+            height: 15px;
+            margin: 15px auto 0;
+            /* 아르누보 덩굴 곡선을 형상화한 배경선 */
+            background: radial-gradient(circle at 50% 100%, transparent 5px, var(--border-gold) 5px, var(--border-gold) 7px, transparent 7px);
+            background-size: 20px 20px;
+        }
+
+        /* -----------------------------------------
+         * 4. HERO SECTION (중앙 대형 후광 문양)
+         * ----------------------------------------- */
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+        }
+
+        /* 무하 성화풍의 아르누보 레이스 메달리온 후광 */
+        .hero-halo {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            border: 2px solid var(--border-gold);
+            background: 
+                repeating-radial-gradient(circle, transparent, transparent 10px, rgba(197, 160, 89, 0.1) 10px, rgba(197, 160, 89, 0.1) 12px),
+                radial-gradient(circle, rgba(217, 130, 43, 0.15) 0%, transparent 70%);
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            animation: haloSpin 60s linear infinite;
+        }
+        @keyframes haloSpin {
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        .hero-content { z-index: 10; }
+        .hero-sub {
+            font-size: 1.3rem;
+            color: var(--accent-plant);
+            letter-spacing: 8px;
+            margin-bottom: 25px;
+        }
+        .hero-title {
+            font-size: 5rem;
+            color: var(--primary-pomegranate);
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 0px rgba(197, 160, 89, 0.2);
+        }
+        .hero-typing {
+            font-size: 1.8rem;
+            color: var(--secondary-amber);
+            min-height: 45px;
+            font-weight: 500;
+        }
+        .cursor {
+            display: inline-block;
+            width: 3px;
+            background-color: var(--secondary-amber);
+            margin-left: 5px;
+            animation: blink 0.8s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* -----------------------------------------
+         * 5. ABOUT ME SECTION
+         * ----------------------------------------- */
+        .about-grid {
+            display: grid;
+            grid-template-columns: 1.21fr 0.79fr;
+            gap: 50px;
+        }
+        .profile-main {
+            border-left: 3px solid var(--primary-pomegranate);
+            padding-left: 35px;
+        }
+        .profile-main h3 {
+            font-size: 2.4rem;
+            color: var(--primary-pomegranate);
+            margin-bottom: 20px;
+        }
+        .meta-info-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+        .meta-item {
+            background: linear-gradient(to right, rgba(197, 160, 89, 0.08), transparent);
+            padding: 20px;
+            border-left: 4px solid var(--secondary-amber);
+        }
+        .meta-label {
+            font-size: 0.95rem;
+            color: var(--accent-plant);
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+        .meta-value { font-size: 1.1rem; }
+
+        /* -----------------------------------------
+         * 6. MY SKILLS SECTION
+         * ----------------------------------------- */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 35px;
+        }
+        .skill-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .skill-name { font-weight: 700; color: var(--primary-pomegranate); font-size: 1.15rem; }
+        .skill-desc { color: var(--accent-plant); font-size: 0.95rem; }
+        .progress-bar-bg {
+            width: 100%; height: 8px;
+            background-color: rgba(197, 160, 89, 0.2);
+            border-radius: 4px; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; width: 0;
+            background: linear-gradient(to right, var(--secondary-amber), var(--primary-pomegranate));
+            transition: width 1.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* -----------------------------------------
+         * 7. MY FAVORITES SECTION (이미지 프레임 카드 포함)
+         * ----------------------------------------- */
+        .fav-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 35px;
+        }
+        .fav-card { text-align: center; padding: 45px 30px; }
+        .fav-icon { font-size: 3rem; margin-bottom: 25px; display: inline-block; }
+        
+        /* 여행 카테고리 내 사그라다 파밀리아 돔 프레임 이미지 */
+        .sagrada-frame {
+            width: 100%;
+            height: 160px;
+            margin-bottom: 20px;
+            border-radius: 50% 50% 0 0; /* 아르누보 돔 아치 형태 */
+            border: 2px solid var(--border-gold);
+            overflow: hidden;
+            position: relative;
+        }
+        .sagrada-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: sepia(0.3) contrast(1.1); /* 고풍스러운 명화 질감 처리 */
+            transition: var(--transition-smooth);
+        }
+        .fav-card:hover .sagrada-img {
+            transform: scale(1.15);
+        }
+        .fav-title { font-size: 1.3rem; color: var(--primary-pomegranate); margin-bottom: 12px; font-weight: 700; }
+        .fav-text { font-size: 0.95rem; opacity: 0.85; }
+
+        /* -----------------------------------------
+         * 8. MY DREAM SECTION
+         * ----------------------------------------- */
+        .dream-wrapper {
+            background: linear-gradient(135deg, #4A1216 0%, var(--primary-pomegranate) 100%);
+            color: var(--text-light);
+            border: 3px double var(--border-gold);
+        }
+        .dream-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center; }
+        .dream-left h3 { font-size: 2.2rem; color: var(--secondary-amber); margin-bottom: 25px; }
+        .dream-right { display: flex; flex-direction: column; gap: 20px; }
+        .vision-box {
+            background: rgba(255, 253, 249, 0.07);
+            border: 1px solid rgba(197, 160, 89, 0.4);
+            padding: 25px;
+            transition: var(--transition-smooth);
+        }
+        .vision-box:hover { background: rgba(255, 253, 249, 0.15); transform: translateX(10px); }
+        .vision-title { color: var(--bg-ivory); font-weight: 700; margin-bottom: 10px; }
+
+        /* -----------------------------------------
+         * 9. QUOTE SECTION & FOOTER
+         * ----------------------------------------- */
+        .quote-card { max-width: 850px; margin: 0 auto; text-align: center; padding: 70px 40px; border-block: 4px double var(--border-gold); }
+        .quote-text { font-size: 2.3rem; color: var(--primary-pomegranate); font-weight: 700; margin-bottom: 25px; }
+        .quote-author { font-size: 1.1rem; color: var(--accent-plant); letter-spacing: 4px; }
+
+        footer {
+            background-color: var(--text-dark);
+            color: var(--bg-card);
+            padding: 65px 0;
+            text-align: center;
+            border-top: 5px solid var(--border-gold);
+            letter-spacing: 2px;
+        }
+        footer .credits { font-size: 1.1rem; color: var(--border-gold); margin-bottom: 15px; }
+        footer .copyright { opacity: 0.4; font-size: 0.85rem; }
+
+        /* -----------------------------------------
+         * 10. RESPONSIVE DESIGN
+         * ----------------------------------------- */
+        @media (max-width: 1024px) {
+            .about-grid, .skills-grid, .dream-grid { grid-template-columns: 1fr; }
+            .fav-grid { grid-template-columns: repeat(2, 1fr); }
+            .hero-title { font-size: 3.8rem; }
+        }
+        @media (max-width: 768px) {
+            .fav-grid { grid-template-columns: 1fr; }
+            .hero-halo { width: 380px; height: 380px; }
+            .quote-text { font-size: 1.7rem; }
+            .gallery-frame { display: none; }
+            .spotlight-overlay { display: none; } /* 모바일 가독성을 위해 스포트라이트 제거 */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="spotlight-overlay" id="spotlight"></div>
+    <div class="mucha-pattern-bg"></div>
+    <div class="gallery-frame"></div>
+
+    <section class="hero">
+        <div class="hero-halo"></div>
+        <div class="hero-content">
+            <p class="hero-sub">Digital Salon</p>
+            <h1 class="hero-title">김시은</h1>
+            <div class="hero-typing"><span id="typing-text"></span><span class="cursor">|</span></div>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2 class="section-title">About Me</h2>
+        <div class="art-card about-grid reveal">
+            <div class="profile-main">
+                <h3>김시은입니다.</h3>
+                <p>온화함 속에 뚜렷한 주도성을 잃지 않는 단단한 내면을 가꾸고자 노력합니다. 환경과 생명에 대한 애정, 인간을 향한 깊은 존중(휴머니즘)을 중심축에 두고 살아갑니다.</p>
+                <p>알폰스 무하의 회화 양식이 보여주는 선의 조화처럼, 복잡한 세상 속에서 아름답고 유기적인 가치를 만들어내고 싶습니다.</p>
+            </div>
+            <div class="meta-info-grid">
+                <div class="meta-item">
+                    <div class="meta-label">관심 예술 양식</div>
+                    <div class="meta-value">알폰스 무하의 아르누보 예술, 자연 테마</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">나의 지향점</div>
+                    <div class="meta-value">사람들이 세상을 더욱 아름답게 느끼도록 만들기</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2 class="section-title">My Character & Skills</h2>
+        <div class="skills-grid">
+            <div class="art-card reveal">
+                <div class="skill-info">
+                    <span class="skill-name">글 쓰기 (Writing)</span>
+                    <span class="skill-desc">영혼을 치유하는 문장력</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" data-progress="90%"></div></div>
+            </div>
+            <div class="art-card reveal">
+                <div class="skill-info">
+                    <span class="skill-name">미술 & 심미안 (Artistry)</span>
+                    <span class="skill-desc">색채와 레이아웃 조화 분석</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" data-progress="85%"></div></div>
+            </div>
+            <div class="art-card reveal">
+                <div class="skill-info">
+                    <span class="skill-name">비문학 독서 (Analytical Reading)</span>
+                    <span class="skill-desc">세상의 유기적 구조 이해</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" data-progress="80%"></div></div>
+            </div>
+            <div class="art-card reveal">
+                <div class="skill-info">
+                    <span class="skill-name">환경 & 생명 가치 (Eco Action)</span>
+                    <span class="skill-desc">자연과의 조화로운 공존 추구</span>
+                </div>
+                <div class="progress-bar-bg"><div class="progress-bar-fill" data-progress="95%"></div></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2 class="section-title">My Favorites</h2>
+        <div class="fav-grid">
+            <div class="art-card fav-card reveal">
+                <div class="fav-icon">🌱</div>
+                <h4 class="fav-title">식물 키우기</h4>
+                <p class="fav-text">자연의 정교한 아르누보적 생명 곡선을 직접 가꾸어 나갑니다.</p>
+            </div>
+            <div class="art-card fav-card reveal">
+                <div class="sagrada-frame">
+                    http://googleusercontent.com/image_collection/image_retrieval/8068382606248948362
+                </div>
+                <h4 class="fav-title">여행 (Travel)</h4>
+                <p class="fav-text">사그라다 파밀리아의 유기적인 대성당 기둥처럼, 인간의 상상력이 자연을 닮아가는 건축과 자연을 관찰합니다.</p>
+            </div>
+            <div class="art-card fav-card reveal">
+                <div class="fav-icon">🚲</div>
+                <h4 class="fav-title">자전거 타기</h4>
+                <p class="fav-text">바람의 흐름과 사계절의 텍스처를 온전히 몸으로 통과하는 행위입니다.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2 class="section-title">My Vision & Dream</h2>
+        <div class="art-card dream-wrapper reveal">
+            <div class="dream-grid">
+                <div class="dream-left">
+                    <h3>“사람들이 세상을 아름답게 느끼도록 하기”</h3>
+                    <p>메마르고 정형화된 일상에 지친 사람들에게 예술과 인문학적 가치를 통해 위로를 던지고 싶습니다. 세상에 존재하는 모든 유기적 가치를 탐구하여 선한 영향력을 펼치는 것이 인생의 궁극적 도달점입니다.</p>
+                </div>
+                <div class="dream-right">
+                    <div class="vision-box">
+                        <div class="vision-title">✦ 이 세상 모든 것 경험하기</div>
+                        <div class="vision-desc">한계와 분야를 나누지 않고 세상 모든 학문과 예술의 미학을 아우르는 지적 탐험을 계속합니다.</div>
+                    </div>
+                    <div class="vision-box">
+                        <div class="vision-title">✦ 휴머니즘 벨트 구축</div>
+                        <div class="vision-desc">글, 식물, 그리고 시각 예술을 하나의 유기적 덩굴처럼 연결하여 사람들을 치유합니다.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <div class="quote-card reveal">
+            <div class="quote-text">“사랑하고 살자”</div>
+            <div class="quote-author">- 김시은의 아우라와 가치관 -</div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="credits">Made with AI & My Imagination</div>
+        <div class="copyright">&copy; 2026 Kim Sieun. Alphonse Mucha Digital Salon Gallery.</div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            /* --- 마우스 포인트 트래킹 스포트라이트 구현 --- */
+            const spotlight = document.getElementById('spotlight');
+            window.addEventListener('mousemove', (e) => {
+                // 부드럽게 빛이 투과되도록 CSS 커스텀 변수 실시간 업데이트
+                spotlight.style.setProperty('--mouse-x', `${e.clientX}px`);
+                spotlight.style.setProperty('--mouse-y', `${e.clientY}px`);
+            });
+
+            /* --- 타이핑 텍스트 루프 구현 --- */
+            const typingText = document.getElementById('typing-text');
+            const message = "사랑하고 살자";
+            let index = 0;
+
+            function typeEffect() {
+                if (index < message.length) {
+                    typingText.textContent += message.charAt(index);
+                    index++;
+                    setTimeout(typeEffect, 200);
+                } else {
+                    setTimeout(() => {
+                        typingText.textContent = "";
+                        index = 0;
+                        typeEffect();
+                    }, 3500);
+                }
+            }
+            setTimeout(typeEffect, 800);
+
+            /* --- 스크롤 릴레이션 & 게이지 활성화 스크립트 --- */
+            const reveals = document.querySelectorAll('.reveal');
+            function checkScroll() {
+                const triggerPoint = window.innerHeight * 0.88;
+                reveals.forEach(reveal => {
+                    const topPos = reveal.getBoundingClientRect().top;
+                    if (topPos < triggerPoint) {
+                        reveal.classList.add('active');
+                        
+                        // 프로그레스바 충전 트리거
+                        const bars = reveal.querySelectorAll('.progress-bar-fill');
+                        bars.forEach(bar => {
+                            bar.style.width = bar.getAttribute('data-progress');
+                        });
+                    }
+                });
+            }
+            window.addEventListener('scroll', checkScroll);
+            checkScroll(); // 최초 실행
+        });
+    </script>
+</body>
+</html>
